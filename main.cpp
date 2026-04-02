@@ -20,6 +20,7 @@ int main() {
 
 
 	ofstream result_file("../../../Matrix_C.txt");
+	result_file << C.get_rows() << " " << C.get_columns() << '\n';
 	result_file << C;
 	result_file << '\n';
 	result_file << "Execution time = " << end - start << "\n";
