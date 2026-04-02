@@ -2,6 +2,10 @@
 #define MATRIX_H
 
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <random>
+
 
 template <typename T>
 class Matrix {
@@ -11,6 +15,7 @@ private:
 	T* _data;
 public:
 	Matrix(size_t rows, size_t columns);
+	Matrix(const char* file_path);
 
 	~Matrix();
 
@@ -29,10 +34,43 @@ Matrix<T>::Matrix(size_t rows, size_t columns) :_rows(rows), _columns(columns) {
 }
 
 template<typename T>
+Matrix<T>::Matrix(const char* file_path) {
+	std::ifstream matrix_file(file_path);
+
+	if (!matrix_file.is_open()) {
+		throw std::invalid_argument("Incorrect file path or cannot open file!");
+	}
+
+	int rows, columns;
+	matrix_file >> rows >> columns;
+
+	if (rows <= 0 || columns <= 0) {
+		throw std::invalid_argument("Matrix dimensions must be positive!");
+	}
+
+	
+	_rows = rows;
+	_columns = columns;
+	_data = new T[rows * columns];
+
+	for (size_t i = 0; i < rows; ++i) {
+		for (size_t j = 0; j < columns; ++j) {
+			if (!(matrix_file >> (*this)(i, j))) {
+				delete[] _data;  
+				throw std::runtime_error("Failed to read matrix element at position ("
+					+ std::to_string(i) + ", " + std::to_string(j) + ")");
+			}
+		}
+	}
+
+	matrix_file.close();
+}
+
+
+template<typename T>
 Matrix<T>::~Matrix() {
 	delete _data;
 }
-
 
 template<typename T>
 size_t Matrix<T>::get_rows() const {
@@ -72,6 +110,38 @@ Matrix<T> Matrix<T>::operator*(const Matrix<T>& rhs) const {
 	return result;
 }
 
+
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const Matrix<T>& matr) {
+	for (size_t i = 0; i < matr.get_rows(); ++i) {
+		for (size_t j = 0; j < matr.get_columns(); ++j) {
+			os << matr(i, j) << " ";
+		}
+		os << "\n";
+	}
+	return os;
+}
+
+
+void generate_int_matrix(size_t rows, size_t columns, const char* file_path) {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<int> dist(1, 100);
+
+	std::ofstream file(file_path);
+	if (!file.is_open()) {
+		throw std::invalid_argument("Uncorrect file path!");
+	}
+
+
+	file << rows << " " << columns << '\n';
+	for (size_t i = 0; i < rows; i++) {
+		for (size_t j = 0; j < columns; j++) {
+			file << dist(gen) << " ";
+		}
+		file << '\n';
+	}
+}
 #endif MATRIX_H
 
 

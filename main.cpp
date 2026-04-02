@@ -1,31 +1,26 @@
 #include <iostream>
 
 #include "Matrix.h"
+#include <filesystem>
+#include <ctime>
 
 using namespace std;
 
 
 int main() {
-	Matrix<int> A(3, 2);
+	generate_int_matrix(200, 400, "../../../Matrix_A.txt");
+	generate_int_matrix(400, 600, "../../../Matrix_B.txt");
 
-	for (size_t i = 0; i < 3; i++) {
-		for (size_t j = 0; j < 2; j++) {
-			cin >> A(i, j);
-		}
-	}
-
-	Matrix<int> B(2, 5);
-	for (size_t i = 0; i < 2; i++) {
-		for (size_t j = 0; j < 5; j++) {
-			cin >> B(i, j);
-		}
-	}
-
+	Matrix<int> A("../../../Matrix_A.txt");
+	Matrix<int> B("../../../Matrix_B.txt");
+	
+	time_t start = clock();
 	Matrix<int> C = A * B;
-	for (size_t i = 0; i < C.get_rows(); i++) {
-		cout << '\n';
-		for (size_t j = 0; j < C.get_columns(); j++) {
-			cout << C(i, j) << " ";
-		}
-	}
+	time_t end = clock();
+
+
+	ofstream result_file("../../../Matrix_C.txt");
+	result_file << C;
+	result_file << '\n';
+	result_file << "Execution time = " << end - start << "\n";
 }
