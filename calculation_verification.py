@@ -125,7 +125,6 @@ def read_matrix_from_file(filename):
         return None
 
 
-# Example usage
 if __name__ == "__main__":
     A = read_matrix_from_file('Matrix_A.txt')
     B = read_matrix_from_file('Matrix_B.txt')
