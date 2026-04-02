@@ -23,4 +23,5 @@ int main() {
 	result_file << C;
 	result_file << '\n';
 	result_file << "Execution time = " << end - start << "\n";
+	result_file << "Task volume: 200x400 and 400x600\n";
 }
