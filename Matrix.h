@@ -3,9 +3,12 @@
 
 #include <iostream>
 #include <fstream>
+#include <filesystem>
+#include <stdexcept>
 #include <string>
 #include <random>
 
+namespace fs = std::filesystem;
 
 template <typename T>
 class Matrix {
@@ -15,7 +18,7 @@ private:
 	T* _data;
 public:
 	Matrix(size_t rows, size_t columns);
-	Matrix(const char* file_path);
+	Matrix(std::string file_path);
 
 	~Matrix();
 
@@ -34,7 +37,7 @@ Matrix<T>::Matrix(size_t rows, size_t columns) :_rows(rows), _columns(columns) {
 }
 
 template<typename T>
-Matrix<T>::Matrix(const char* file_path) {
+Matrix<T>::Matrix(std::string file_path) {
 	std::ifstream matrix_file(file_path);
 
 	if (!matrix_file.is_open()) {
@@ -123,12 +126,42 @@ std::ostream& operator<<(std::ostream& os, const Matrix<T>& matr) {
 }
 
 
-void generate_int_matrix(size_t rows, size_t columns, const char* file_path) {
+void createFileWithDirs(const std::string& file_path) {
+	try {
+		// Извлекаем путь к директории из полного пути к файлу
+		fs::path path(file_path);
+		fs::path dir_path = path.parent_path();
+
+		// Если директория не пустая и не существует — создаём все промежуточные папки
+		if (!dir_path.empty() && !fs::exists(dir_path)) {
+			fs::create_directories(dir_path);
+			std::cout << "Created directory: " << dir_path << std::endl;
+		}
+
+		// Создаём/открываем файл для записи
+		std::ofstream file(file_path, std::ios::out | std::ios::trunc);
+		if (!file.is_open()) {
+			throw std::runtime_error("Cannot open file: " + file_path);
+		}
+		file.close();
+
+		std::cout << "File created: " << file_path << std::endl;
+	}
+	catch (const fs::filesystem_error& e) {
+		throw std::runtime_error("Ошибка файловой системы: " + std::string(e.what()));
+	}
+}
+
+
+
+void generate_int_matrix(size_t rows, size_t columns, std::string file_path) {
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_int_distribution<int> dist(1, 100);
 
-	std::ofstream file(file_path);
+	createFileWithDirs(file_path);
+	std::ofstream file;
+	file.open(file_path, std::ios::out | std::ios::trunc);
 	if (!file.is_open()) {
 		throw std::invalid_argument("Uncorrect file path!");
 	}
