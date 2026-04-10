@@ -1,4 +1,4 @@
-# LAB №1 REPORT
+# LAB №2 REPORT
 
 ## Задание:
 
