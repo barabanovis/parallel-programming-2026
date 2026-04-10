@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <string>
 #include <random>
+#include <omp.h>
 
 namespace fs = std::filesystem;
 
@@ -28,7 +29,7 @@ public:
 	T& operator()(size_t row, size_t column);
 	const T operator()(size_t row, size_t column) const;
 
-	Matrix<T> operator*(const Matrix<T>& rhs) const;
+	Matrix<T> matr_multiply(const Matrix<T>& rhs,size_t num_threads) const;
 };
 
 template<typename T>
@@ -97,17 +98,21 @@ const T Matrix<T>::operator()(size_t row, size_t column) const {
 }
 
 template<typename T>
-Matrix<T> Matrix<T>::operator*(const Matrix<T>& rhs) const {
+Matrix<T> Matrix<T>::matr_multiply(const Matrix<T>& rhs, size_t num_threads) const {
 	if (get_columns() != rhs.get_rows()) {
 		throw std::runtime_error("Matricies cannot be multiplicated!");
 	}
+
 	Matrix<T> result(get_rows(), rhs.get_columns());
-	for (size_t i = 0; i < result.get_rows(); ++i) {
-		for (size_t j = 0; j < result.get_columns(); ++j) {
-			result(i, j) = 0;
-			for (size_t s = 0; s < get_columns(); ++s) {
-				result(i, j) += (*this)(i, s) * rhs(s, j);
+	
+	#pragma omp parallel for collapse(2) num_threads(num_threads)
+	for (int i = 0; i < result.get_rows(); ++i) {
+		for (int j = 0; j < result.get_columns(); ++j) {
+			T sum = 0;
+			for (int s = 0; s < get_columns(); ++s) {
+				sum += (*this)(i, s) * rhs(s, j);
 			}
+			result(i, j) = sum;
 		}
 	}
 	return result;

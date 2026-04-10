@@ -1,13 +1,19 @@
 cmake_minimum_required(VERSION 3.12)
 
-project("lab1_parallel" CXX)
+project("lab2_parallel" CXX)
 
-
+# 1. Поиск пакета OpenMP
+find_package(OpenMP REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable("lab1_parallel" "main.cpp" "Matrix.h" )
+add_executable("lab2_parallel" "main.cpp" "Matrix.h" )
+
+# 2. Подключение OpenMP к исполняемому файлу
+if(OpenMP_CXX_FOUND)
+    target_link_libraries("lab2_parallel" PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR
    CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
