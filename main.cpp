@@ -1,9 +1,10 @@
 #include <iostream>
-
+#include "mpi.h"
 #include "Matrix.h"
 #include <filesystem>
 #include <ctime>
 #include <string>
+
 using namespace std;
 
 void print_results(string file_path, size_t size, vector<double> exp_results) {
@@ -55,6 +56,7 @@ double experiment(int size,size_t num_threads) {
 
 
 int main() {
+	/*
 	string result_file_path = "../../../results/statistics.csv";
 
 	ofstream file(result_file_path);
@@ -69,5 +71,6 @@ int main() {
 		}
 		print_results(result_file_path, size, exp_results);
 	}
+	*/
 
 }

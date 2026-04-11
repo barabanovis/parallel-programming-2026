@@ -1,18 +1,27 @@
 cmake_minimum_required(VERSION 3.12)
 
-project("lab2_parallel" CXX)
+project("lab3_parallel" CXX)
 
-# 1. ����� ������ OpenMP
-find_package(OpenMP REQUIRED)
+
+find_package(MPI REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable("lab2_parallel" "main.cpp" "Matrix.h" )
+add_executable("lab3_parallel" "main.cpp" "Matrix.h" )
 
-# 2. ����������� OpenMP � ������������ �����
-if(OpenMP_CXX_FOUND)
-    target_link_libraries("lab2_parallel" PUBLIC OpenMP::OpenMP_CXX)
+# Подключение заголовочных файлов MPI
+target_include_directories("lab3_parallel" PRIVATE ${MPI_INCLUDE_PATH})
+
+# Линковка с библиотеками MPI
+target_link_libraries("lab3_parallel" PRIVATE ${MPI_C_LIBRARIES})
+
+# Установка компиляторов MPI (опционально)
+if(MPI_C_COMPILER)
+    set_target_properties("lab3_parallel" PROPERTIES
+        CXX_COMPILER ${MPI_CXX_COMPILER}
+        C_COMPILER ${MPI_C_COMPILER}
+    )
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR
