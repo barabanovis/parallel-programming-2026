@@ -1,0 +1,45 @@
+{
+    "paths": {
+        "input_data": "results/statistics.csv",
+        "output_dir": "results/graphs",
+        "output_files": {
+            "execution_time": "1_execution_time.png",
+            "bar_comparison": "2_bar_comparison.png",
+            "speedup": "3_speedup.png",
+            "efficiency": "4_efficiency.png",
+            "all_measurements": "5_all_measurements.png",
+            "statistics_summary": "statistics_summary.csv",
+            "speedup_summary": "speedup_summary.csv"
+        }
+    },
+    "plot_settings": {
+        "figure_sizes": {
+            "main": [16, 6],
+            "bar": [14, 8],
+            "speedup": [12, 8],
+            "scatter": [14, 8]
+        },
+        "dpi": 300,
+        "style": "seaborn-v0_8-darkgrid",
+        "font_family": "DejaVu Sans",
+        "error_alpha": 0.2,
+        "bar_width": 0.2,
+        "selected_sizes_step": 2,
+        "large_sizes_threshold": 1500
+    },
+    "processes": {
+        "column_name": "proccess_number",
+        "fallback_column": "process_count"
+    },
+    "colors": {
+        "colormap": "viridis"
+    },
+    "markers": ["o", "s", "^", "D"],
+    "speedup": {
+        "ideal_lines": true,
+        "ylim_max_offset": 1
+    },
+    "efficiency": {
+        "ylim_max": 1.1
+    }
+}

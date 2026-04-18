@@ -1,0 +1,8 @@
+{
+    "work_path": "E:/working/parallel-programming-2026",
+    "results_dir": "results",
+    "matrix_a_file": "matrA.txt",
+    "matrix_b_file": "matrB.txt",
+    "matrix_c_file": "matrC.txt",
+    "statistics_file": "statistics.csv"
+}

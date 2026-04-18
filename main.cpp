@@ -4,13 +4,78 @@
 #include <filesystem>
 #include <ctime>
 #include <string>
+#include <fstream>
 
 using namespace std;
+namespace fs = std::filesystem;
+
+// Функция для чтения JSON файла (улучшенный парсинг)
+string get_json_value(const string& json_path, const string& key) {
+    ifstream file(json_path);
+    if (!file.is_open()) {
+        cerr << "Error: Could not open config file: " << json_path << "\n";
+        return "";
+    }
+
+    string content, line;
+    while (getline(file, line)) {
+        content += line;
+    }
+    file.close();
+
+    // Ищем ключ
+    string search_key = "\"" + key + "\"";
+    size_t key_pos = content.find(search_key);
+    if (key_pos == string::npos) {
+        cerr << "Error: Key not found: " << key << "\n";
+        return "";
+    }
+
+    // Ищем двоеточие после ключа
+    size_t colon_pos = content.find(":", key_pos);
+    if (colon_pos == string::npos) {
+        return "";
+    }
+
+    // Ищем открывающую кавычку значения
+    size_t start_quote = content.find("\"", colon_pos + 1);
+    if (start_quote == string::npos) {
+        // Может быть значение без кавычек (число)
+        size_t end_pos = content.find_first_of(",}\n", colon_pos + 1);
+        if (end_pos != string::npos) {
+            return content.substr(colon_pos + 1, end_pos - colon_pos - 1);
+        }
+        return "";
+    }
+
+    // Ищем закрывающую кавычку
+    size_t end_quote = content.find("\"", start_quote + 1);
+    if (end_quote == string::npos) {
+        return "";
+    }
+
+    return content.substr(start_quote + 1, end_quote - start_quote - 1);
+}
 
 void print_matrix(Matrix<int>& C, string path) {
+    // Создаем директорию, если её нет
+    fs::path file_path(path);
+    fs::path dir_path = file_path.parent_path();
+    if (!dir_path.empty() && !fs::exists(dir_path)) {
+        fs::create_directories(dir_path);
+        cout << "Created directory: " << dir_path << "\n";
+    }
+
+    // Сохраняем матрицу
     ofstream file(path);
-    file << C;
-    file.close();
+    if (file.is_open()) {
+        file << C;
+        file.close();
+        cout << "Result matrix C saved to " << path << "\n";
+    }
+    else {
+        cerr << "Error: could not save matrix C to " << path << "\n";
+    }
 }
 
 struct Experiment {
@@ -20,9 +85,8 @@ struct Experiment {
 };
 
 Experiment MatrixMultiplicationMPI(Matrix<int>& A, Matrix<int>& B, int rank, int num_processes) {
-    int n = A.get_rows();  // Размер матрицы
+    int n = A.get_rows();
 
-    // Проверка: не больше ли процессов, чем строк
     if (num_processes > n) {
         if (rank == 0) {
             cerr << "Warning: More processes (" << num_processes
@@ -33,14 +97,12 @@ Experiment MatrixMultiplicationMPI(Matrix<int>& A, Matrix<int>& B, int rank, int
     MPI_Barrier(MPI_COMM_WORLD);
     auto start = MPI_Wtime();
 
-    // 1. Рассылка матрицы B всем процессам
     int bcast_result = MPI_Bcast(B.data(), n * n, MPI_INT, 0, MPI_COMM_WORLD);
     if (bcast_result != MPI_SUCCESS) {
         cerr << "MPI_Bcast failed on rank " << rank << "\n";
         return { n, num_processes, -1.0 };
     }
 
-    // 2. Распределение строк матрицы A
     int rows_per_process = n / num_processes;
     int remainder = n % num_processes;
 
@@ -56,17 +118,14 @@ Experiment MatrixMultiplicationMPI(Matrix<int>& A, Matrix<int>& B, int rank, int
         current_row += rows_count[i];
     }
 
-    // 3. Локальные данные для каждого процесса
     int local_rows = rows_count[rank];
     vector<int> local_A(local_rows * n);
 
-    // Проверка размера локального буфера
     if (local_A.empty() && local_rows > 0) {
         cerr << "Memory allocation failed on rank " << rank << "\n";
         return { n, num_processes, -1.0 };
     }
 
-    // 4. Рассылка строк матрицы A
     int scatterv_result = MPI_Scatterv(A.data(), send_counts.data(), displs.data(), MPI_INT,
         local_A.data(), local_rows * n, MPI_INT, 0, MPI_COMM_WORLD);
     if (scatterv_result != MPI_SUCCESS) {
@@ -74,21 +133,18 @@ Experiment MatrixMultiplicationMPI(Matrix<int>& A, Matrix<int>& B, int rank, int
         return { n, num_processes, -1.0 };
     }
 
-    // 5. Параллельное вычисление (каждый процесс считает свою часть)
     vector<int> local_result(local_rows * n, 0);
 
-    // Оптимизированный порядок умножения (ikj)
     for (int i = 0; i < local_rows; i++) {
         for (int k = 0; k < n; k++) {
             int aik = local_A[i * n + k];
-            if (aik == 0) continue;  // Пропуск нулей
+            if (aik == 0) continue;
             for (int j = 0; j < n; j++) {
                 local_result[i * n + j] += aik * B.data()[k * n + j];
             }
         }
     }
 
-    // 6. Сбор результатов на процессе 0
     vector<int> flat_result;
     if (rank == 0) {
         flat_result.resize(n * n);
@@ -102,7 +158,6 @@ Experiment MatrixMultiplicationMPI(Matrix<int>& A, Matrix<int>& B, int rank, int
         return { n, num_processes, -1.0 };
     }
 
-    // 7. Копируем результат обратно в A на процессе 0
     if (rank == 0) {
         for (size_t i = 0; i < flat_result.size(); i++) {
             A.data()[i] = flat_result[i];
@@ -147,7 +202,6 @@ int parse_matrix_size(int& argc, char**& argv) {
 }
 
 void save_results(string file_path, Experiment exp) {
-    // Создаем директорию если не существует
     fs::path path(file_path);
     fs::path dir_path = path.parent_path();
     if (!dir_path.empty() && !fs::exists(dir_path)) {
@@ -166,51 +220,56 @@ void save_results(string file_path, Experiment exp) {
 }
 
 int main(int argc, char** argv) {
-    string work_path = "E:/working/parallel-programming-2026";
+    // Читаем пути из JSON файла
+    string config_path = "../../../paths.json";
+    string work_path = get_json_value(config_path, "work_path");
+    string results_dir = get_json_value(config_path, "results_dir");
+    string matrix_a_file = get_json_value(config_path, "matrix_a_file");
+    string matrix_b_file = get_json_value(config_path, "matrix_b_file");
+    string matrix_c_file = get_json_value(config_path, "matrix_c_file");
+    string statistics_file = get_json_value(config_path, "statistics_file");
+
+    // Формируем полные пути
+    string results_path = work_path + "/" + results_dir;
+    string matrA_path = results_path + "/" + matrix_a_file;
+    string matrB_path = results_path + "/" + matrix_b_file;
+    string matrC_path = results_path + "/" + matrix_c_file;
+    string statistics_path = results_path + "/" + statistics_file;
+
     MPI_Init(&argc, &argv);
 
     int rank, num_processes;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
 
-    Matrix<int> A, B;  // Пустые матрицы
+    Matrix<int> A, B, C;  // Добавлена матрица C для результата
     int matrix_size = 0;
 
-    // ТОЛЬКО ПРОЦЕСС 0: создает файлы, генерирует и загружает матрицы
     if (rank == 0) {
         matrix_size = parse_matrix_size(argc, argv);
 
-        string matrA_path = work_path+"/results/matrA.txt";
-        string matrB_path = work_path + "/results/matrB.txt";
-
-        // Создаем директорию для результатов
-        fs::path results_dir = work_path + "/results";
-        if (!fs::exists(results_dir)) {
-            fs::create_directories(results_dir);
+        fs::path results_dir_path = results_path;
+        if (!fs::exists(results_dir_path)) {
+            fs::create_directories(results_dir_path);
         }
 
-        // Генерируем матрицы
         cout << "Generating matrices of size " << matrix_size << "x" << matrix_size << "...\n";
         generate_int_matrix(matrix_size, matrix_size, matrA_path);
         generate_int_matrix(matrix_size, matrix_size, matrB_path);
 
-        // Загружаем матрицы
         A = Matrix<int>(matrA_path);
         B = Matrix<int>(matrB_path);
 
         cout << "Matrices generated and loaded by process 0\n";
     }
 
-    // Рассылаем размер матрицы всем процессам
     MPI_Bcast(&matrix_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    // Для не-нулевых процессов создаем пустые матрицы нужного размера
     if (rank != 0) {
         A = Matrix<int>(matrix_size, matrix_size);
         B = Matrix<int>(matrix_size, matrix_size);
     }
 
-    // Рассылаем данные матриц (только после того, как процесс 0 их загрузил)
     MPI_Bcast(A.data(), matrix_size * matrix_size, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(B.data(), matrix_size * matrix_size, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -218,13 +277,17 @@ int main(int argc, char** argv) {
         cout << "All processes have received matrices. Starting parallel multiplication...\n";
     }
 
-    // ВСЕ РАСПАРАЛЛЕЛИВАНИЕ ТОЛЬКО ЗДЕСЬ!
     Experiment exp = MatrixMultiplicationMPI(A, B, rank, num_processes);
 
-    // Сохраняем результаты (только процесс 0)
     if (rank == 0) {
-        save_results(work_path + "/results/statistics.csv", exp);
+        // Сохраняем результаты
+        save_results(statistics_path, exp);
+
+        // Сохраняем результирующую матрицу C (A после умножения содержит результат)
+        print_matrix(A, matrC_path);
+
         cout << "Matrix multiplication completed in " << exp.exec_time << " seconds\n";
+        cout << "Result matrix C saved to " << matrC_path << "\n";
     }
 
     MPI_Finalize();
