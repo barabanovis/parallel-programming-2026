@@ -3,29 +3,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 import os
-import json
 
-# ==================== ЗАГРУЗКА КОНФИГУРАЦИИ ====================
-with open('graph_config.json', 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-# ==================== НАСТРОЙКА ====================
 # Настройка русских шрифтов
-plt.rcParams['font.family'] = config['plot_settings']['font_family']
+plt.rcParams['font.family'] = 'DejaVu Sans'
 
-# Создаем папку для графиков
-output_dir = config['paths']['output_dir']
+# Создаем папку для графиков, если её нет
+output_dir = 'results/graphs'  # Исправлен разделитель на /
 os.makedirs(output_dir, exist_ok=True)
 print(f"Графики будут сохранены в папку: {output_dir}")
 
 # Загрузка данных
-input_path = config['paths']['input_data']
-df = pd.read_csv(input_path)
+df = pd.read_csv('results/statistics.csv')
 
 # Определяем название столбца с процессами
-process_col = config['processes']['column_name']
-if process_col not in df.columns:
-    process_col = config['processes']['fallback_column']
+process_col = 'proccess_number' if 'proccess_number' in df.columns else 'process_count'
 if process_col not in df.columns:
     process_col = df.columns[1]
 
@@ -56,12 +47,11 @@ print(df_stats[['matrix_size', 'process_count', 'count']].head(10))
 processes = sorted(df_stats['process_count'].unique())
 
 # Настройка стиля графиков
-plt.style.use(config['plot_settings']['style'])
+plt.style.use('seaborn-v0_8-darkgrid')
 colors = plt.cm.viridis(np.linspace(0, 1, len(processes)))
 
 # ==================== ГРАФИК 1: Время выполнения (линейный масштаб) ====================
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=tuple(
-    config['plot_settings']['figure_sizes']['main']))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
 for i, proc in enumerate(processes):
     data = df_stats[df_stats['process_count'] == proc]
@@ -69,11 +59,10 @@ for i, proc in enumerate(processes):
              marker='o', label=f'{proc} процесс(а/ов)',
              color=colors[i], linewidth=2, markersize=8)
 
-    # Добавляем полосы ошибок (стандартное отклонение)
     ax1.fill_between(data['matrix_size'],
                      data['mean_time'] - data['std_time'],
                      data['mean_time'] + data['std_time'],
-                     alpha=config['plot_settings']['error_alpha'], color=colors[i])
+                     alpha=0.2, color=colors[i])
 
 ax1.set_xlabel('Размер матрицы (N x N)', fontsize=12, fontweight='bold')
 ax1.set_ylabel('Время выполнения (секунды)', fontsize=12, fontweight='bold')
@@ -97,37 +86,49 @@ ax2.legend(loc='upper left', fontsize=10)
 ax2.grid(True, alpha=0.3, which='both')
 
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, config['paths']['output_files']['execution_time']),
-            dpi=config['plot_settings']['dpi'], bbox_inches='tight')
+plt.savefig(os.path.join(output_dir, '1_execution_time.png'),
+            dpi=300, bbox_inches='tight')
 plt.show()
-print(
-    f"Сохранен: {os.path.join(output_dir, config['paths']['output_files']['execution_time'])}")
+print(f"Сохранен: {os.path.join(output_dir, '1_execution_time.png')}")
 
 # ==================== ГРАФИК 3: Сравнение среднего времени (столбчатая диаграмма) ====================
-fig, ax3 = plt.subplots(figsize=tuple(
-    config['plot_settings']['figure_sizes']['bar']))
+fig, ax3 = plt.subplots(figsize=(14, 8))
 
-# Выбираем каждый N-й размер для читаемости
-selected_sizes = df_stats['matrix_size'].unique(
-)[::config['plot_settings']['selected_sizes_step']]
+# Выбираем каждый 2-й размер для читаемости
+all_sizes = sorted(df_stats['matrix_size'].unique())
+selected_sizes = all_sizes[::2]
 
-bar_width = config['plot_settings']['bar_width']
+# Создаем словарь для быстрого доступа к данным по каждому размеру
+data_by_size = {}
+for proc in processes:
+    data = df_stats[df_stats['process_count'] == proc]
+    data_by_size[proc] = {row['matrix_size']                          : row for _, row in data.iterrows()}
+
+bar_width = 0.2
 x_positions = np.arange(len(selected_sizes))
 
 for i, proc in enumerate(processes):
-    data = df_stats[df_stats['process_count'] == proc]
-    data_selected = data[data['matrix_size'].isin(selected_sizes)]
+    means = []
+    stds = []
+    for size in selected_sizes:
+        if size in data_by_size[proc]:
+            means.append(data_by_size[proc][size]['mean_time'])
+            stds.append(data_by_size[proc][size]['std_time'])
+        else:
+            means.append(0)
+            stds.append(0)
 
     offset = (i - len(processes)/2) * bar_width + bar_width/2
 
-    bars = ax3.bar(x_positions + offset, data_selected['mean_time'],
+    bars = ax3.bar(x_positions + offset, means,
                    width=bar_width, label=f'{proc} процесс(а/ов)',
                    color=colors[i], alpha=0.7, edgecolor='black')
 
-    # Добавляем error bars
-    ax3.errorbar(x_positions + offset, data_selected['mean_time'],
-                 yerr=data_selected['std_time'],
-                 fmt='none', color='black', capsize=3, capthick=1)
+    # Добавляем error bars только для ненулевых значений
+    for j, (mean, std) in enumerate(zip(means, stds)):
+        if mean > 0:
+            ax3.errorbar(x_positions[j] + offset, mean, yerr=std,
+                         fmt='none', color='black', capsize=3, capthick=1)
 
 ax3.set_xlabel('Размер матрицы (N x N)', fontsize=12, fontweight='bold')
 ax3.set_ylabel('Время выполнения (секунды)', fontsize=12, fontweight='bold')
@@ -139,15 +140,13 @@ ax3.legend(loc='upper left', fontsize=10)
 ax3.grid(True, alpha=0.3, axis='y')
 
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, config['paths']['output_files']['bar_comparison']),
-            dpi=config['plot_settings']['dpi'], bbox_inches='tight')
+plt.savefig(os.path.join(output_dir, '2_bar_comparison.png'),
+            dpi=300, bbox_inches='tight')
 plt.show()
-print(
-    f"Сохранен: {os.path.join(output_dir, config['paths']['output_files']['bar_comparison'])}")
+print(f"Сохранен: {os.path.join(output_dir, '2_bar_comparison.png')}")
 
 # ==================== ГРАФИК 4: Ускорение (Speedup) ====================
-fig, ax4 = plt.subplots(figsize=tuple(
-    config['plot_settings']['figure_sizes']['speedup']))
+fig, ax4 = plt.subplots(figsize=(12, 8))
 
 # Берем время для 1 процесса как базовое
 baseline = df_stats[df_stats['process_count']
@@ -171,17 +170,14 @@ for i, proc in enumerate(processes):
              marker='D', label=f'{proc} процессов (реальное ускорение)',
              color=colors[i], linewidth=2, markersize=8)
 
-    # Добавляем полосу ошибок
     ax4.fill_between(data['matrix_size'],
                      data['speedup'] - data['speedup_std'],
                      data['speedup'] + data['speedup_std'],
-                     alpha=config['plot_settings']['error_alpha'], color=colors[i])
+                     alpha=0.2, color=colors[i])
 
-    # Добавляем линию идеального ускорения
-    if config['speedup']['ideal_lines']:
-        ax4.plot(data['matrix_size'], [proc] * len(data['matrix_size']),
-                 linestyle='--', alpha=0.6, color=colors[i], linewidth=2,
-                 label=f'{proc} процессов (идеальное ускорение)')
+    ax4.plot(data['matrix_size'], [proc] * len(data['matrix_size']),
+             linestyle='--', alpha=0.6, color=colors[i], linewidth=2,
+             label=f'{proc} процессов (идеальное ускорение)')
 
 ax4.set_xlabel('Размер матрицы (N x N)', fontsize=12, fontweight='bold')
 ax4.set_ylabel('Ускорение', fontsize=12, fontweight='bold')
@@ -191,18 +187,16 @@ ax4.legend(loc='upper left', fontsize=10, ncol=2)
 ax4.grid(True, alpha=0.3)
 ax4.set_xscale('log')
 ax4.set_xlim([min(df_stats['matrix_size']), max(df_stats['matrix_size'])])
-ax4.set_ylim([0, max(processes) + config['speedup']['ylim_max_offset']])
+ax4.set_ylim([0, max(processes) + 1])
 
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, config['paths']['output_files']['speedup']),
-            dpi=config['plot_settings']['dpi'], bbox_inches='tight')
+plt.savefig(os.path.join(output_dir, '3_speedup.png'),
+            dpi=300, bbox_inches='tight')
 plt.show()
-print(
-    f"Сохранен: {os.path.join(output_dir, config['paths']['output_files']['speedup'])}")
+print(f"Сохранен: {os.path.join(output_dir, '3_speedup.png')}")
 
 # ==================== ГРАФИК 5: Эффективность параллелизации ====================
-fig, ax5 = plt.subplots(figsize=tuple(
-    config['plot_settings']['figure_sizes']['speedup']))
+fig, ax5 = plt.subplots(figsize=(12, 8))
 
 for i, proc in enumerate(processes):
     if proc == 1:
@@ -218,7 +212,7 @@ for i, proc in enumerate(processes):
     ax5.fill_between(data['matrix_size'],
                      efficiency - efficiency_std,
                      efficiency + efficiency_std,
-                     alpha=config['plot_settings']['error_alpha'], color=colors[i])
+                     alpha=0.2, color=colors[i])
 
 ax5.set_xlabel('Размер матрицы (N x N)', fontsize=12, fontweight='bold')
 ax5.set_ylabel('Эффективность параллелизации', fontsize=12, fontweight='bold')
@@ -227,49 +221,17 @@ ax5.set_title('Эффективность параллельных вычисл�
 ax5.legend(loc='best', fontsize=10)
 ax5.grid(True, alpha=0.3)
 ax5.set_xscale('log')
-ax5.set_ylim([0, config['efficiency']['ylim_max']])
+ax5.set_ylim([0, 1.1])
 ax5.axhline(y=1.0, linestyle=':', alpha=0.5,
             color='black', label='Идеальная эффективность')
 ax5.set_xlim([min(df_stats['matrix_size']), max(df_stats['matrix_size'])])
 
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, config['paths']['output_files']['efficiency']),
-            dpi=config['plot_settings']['dpi'], bbox_inches='tight')
+plt.savefig(os.path.join(output_dir, '4_efficiency.png'),
+            dpi=300, bbox_inches='tight')
 plt.show()
-print(
-    f"Сохранен: {os.path.join(output_dir, config['paths']['output_files']['efficiency'])}")
+print(f"Сохранен: {os.path.join(output_dir, '4_efficiency.png')}")
 
-# ==================== ГРАФИК 6: Разброс измерений ====================
-fig, ax6 = plt.subplots(figsize=tuple(
-    config['plot_settings']['figure_sizes']['scatter']))
-
-markers = config['markers']
-for i, proc in enumerate(processes):
-    data_raw = df[df[process_col] == proc]
-    jitter = (i - len(processes)/2) * 5
-    ax6.scatter(data_raw['matrix_size'] + jitter, data_raw['execution_time'],
-                label=f'{proc} процесс(а/ов)', alpha=0.6, s=30,
-                marker=markers[i % len(markers)], color=colors[i])
-
-    data_stats = df_stats[df_stats['process_count'] == proc]
-    ax6.plot(data_stats['matrix_size'], data_stats['mean_time'],
-             color=colors[i], linewidth=2, alpha=0.8)
-
-ax6.set_xlabel('Размер матрицы (N x N)', fontsize=12, fontweight='bold')
-ax6.set_ylabel('Время выполнения (секунды)', fontsize=12, fontweight='bold')
-ax6.set_title('Все измерения со средними линиями\n(каждая точка - один эксперимент)',
-              fontsize=14, fontweight='bold')
-ax6.legend(loc='upper left', fontsize=10)
-ax6.grid(True, alpha=0.3)
-ax6.set_yscale('log')
-ax6.set_xscale('log')
-
-plt.tight_layout()
-plt.savefig(os.path.join(output_dir, config['paths']['output_files']['all_measurements']),
-            dpi=config['plot_settings']['dpi'], bbox_inches='tight')
-plt.show()
-print(
-    f"Сохранен: {os.path.join(output_dir, config['paths']['output_files']['all_measurements'])}")
 
 # ==================== СТАТИСТИЧЕСКИЙ АНАЛИЗ ====================
 print("\n" + "="*80)
@@ -302,8 +264,11 @@ for proc in processes:
     data['n_cubed'] = data['matrix_size'] ** 3
     data['n_squared'] = data['matrix_size'] ** 2
 
+    # Регрессия для O(n³)
     slope_cubic, intercept_cubic, r_cubic, p_cubic, se_cubic = stats.linregress(
         data['n_cubed'], data['mean_time'])
+
+    # Регрессия для O(n²)
     slope_quad, intercept_quad, r_quad, p_quad, se_quad = stats.linregress(
         data['n_squared'], data['mean_time'])
 
@@ -315,6 +280,7 @@ for proc in processes:
         f"  Модель O(n²):  время = {slope_quad:.3e} * n² + {intercept_quad:.3e}")
     print(f"                R² = {r_quad**2:.4f}")
 
+    # Определяем лучшую модель
     if r_cubic**2 > r_quad**2:
         print(f"  ✓ Лучше описывается моделью O(n³)")
     else:
@@ -325,9 +291,7 @@ print("\n" + "="*80)
 print("АНАЛИЗ УСКОРЕНИЯ ДЛЯ БОЛЬШИХ МАТРИЦ")
 print("="*80)
 
-large_threshold = config['plot_settings']['large_sizes_threshold']
-large_sizes = df_stats[df_stats['matrix_size']
-                       >= large_threshold]['matrix_size'].unique()
+large_sizes = df_stats[df_stats['matrix_size'] >= 1500]['matrix_size'].unique()
 for proc in processes:
     if proc == 1:
         continue
@@ -335,18 +299,15 @@ for proc in processes:
                             (df_speedup['matrix_size'].isin(large_sizes))]
     if len(data_large) > 0:
         avg_speedup = data_large['speedup'].mean()
-        print(f"\nДля {proc} процессов на матрицах ≥{large_threshold}:")
+        print(f"\nДля {proc} процессов на матрицах ≥1500:")
         print(f"  Среднее ускорение: {avg_speedup:.2f}x")
         print(f"  Эффективность: {avg_speedup/proc*100:.1f}%")
 
 # Сохранение статистики в CSV
 df_stats.to_csv(os.path.join(
-    output_dir, config['paths']['output_files']['statistics_summary']), index=False)
-df_speedup.to_csv(os.path.join(
-    output_dir, config['paths']['output_files']['speedup_summary']), index=False)
+    output_dir, 'statistics_summary.csv'), index=False)
+df_speedup.to_csv(os.path.join(output_dir, 'speedup_summary.csv'), index=False)
 print(f"\n\nСтатистика сохранена в файлы:")
-print(
-    f"  - {os.path.join(output_dir, config['paths']['output_files']['statistics_summary'])}")
-print(
-    f"  - {os.path.join(output_dir, config['paths']['output_files']['speedup_summary'])}")
+print(f"  - {os.path.join(output_dir, 'statistics_summary.csv')}")
+print(f"  - {os.path.join(output_dir, 'speedup_summary.csv')}")
 print(f"\nВсе графики сохранены в папку: {output_dir}")
