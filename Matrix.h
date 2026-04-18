@@ -18,19 +18,47 @@ private:
 	size_t _columns;
 	T* _data;
 public:
+	Matrix();
 	Matrix(size_t rows, size_t columns);
 	Matrix(std::string file_path);
 
 	~Matrix();
 
+	T* data()const;
 	size_t get_rows() const;
 	size_t get_columns() const;
 
+	Matrix<T>& operator=(const Matrix<T>& rhs);
 	T& operator()(size_t row, size_t column);
 	const T operator()(size_t row, size_t column) const;
 
 	Matrix<T> matr_multiply(const Matrix<T>& rhs,size_t num_threads) const;
 };
+
+template<typename T>
+T* Matrix<T>::data() const {
+	return _data;
+}
+
+template<typename T>
+Matrix<T>& Matrix<T>::operator=(const Matrix<T>& rhs){
+	delete[] _data;
+	
+	_rows = rhs.get_rows();
+	_columns = rhs.get_columns();
+
+	_data = new T[_rows * _columns];
+	for (size_t i = 0; i < _rows * _columns; i++) {
+		_data[i] = rhs._data[i];
+	}
+	return *this;
+}
+
+template<typename T>
+Matrix<T>::Matrix():_data(nullptr){
+	_rows = 0;
+	_columns = 0;
+}
 
 template<typename T>
 Matrix<T>::Matrix(size_t rows, size_t columns) :_rows(rows), _columns(columns) {
@@ -73,7 +101,7 @@ Matrix<T>::Matrix(std::string file_path) {
 
 template<typename T>
 Matrix<T>::~Matrix() {
-	delete _data;
+	delete[] _data;
 }
 
 template<typename T>
@@ -179,6 +207,21 @@ void generate_int_matrix(size_t rows, size_t columns, std::string file_path) {
 		}
 		file << '\n';
 	}
+}
+
+Matrix<int> generate_int_matrix(size_t rows, size_t columns) {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<int> dist(1, 100);
+
+
+	Matrix<int> M(rows, columns);
+	for (size_t i = 0; i < rows; ++i) {
+		for (size_t j = 0; j < columns; j++) {
+			M(i, j) = dist(gen);
+		}
+	}
+	return M;
 }
 #endif MATRIX_H
 
