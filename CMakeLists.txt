@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.12)
+
+project("lab5_parallel" CXX)
+
+find_package(MPI REQUIRED)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable("lab5_parallel" "main.cpp" "Matrix.h")
+
+target_include_directories("lab5_parallel" PRIVATE ${MPI_INCLUDE_PATH})
+target_link_libraries("lab5_parallel" PRIVATE ${MPI_CXX_LIBRARIES})
+
+if(MPI_C_COMPILER)
+    set_target_properties("lab5_parallel" PROPERTIES
+        CXX_COMPILER ${MPI_CXX_COMPILER}
+        C_COMPILER ${MPI_C_COMPILER}
+    )
+endif()
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR
+   CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
+   CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${PROJECT_NAME} PRIVATE "-Wall" "-Weffc++" "-Wextra" "-Wpedantic")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+        string(REGEX REPLACE "/W[0-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    endif()
+    target_compile_options(${PROJECT_NAME} PRIVATE "/W4" "/utf-8")
+endif()
