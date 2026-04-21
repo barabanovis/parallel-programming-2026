@@ -1,0 +1,6 @@
+Using matrix size: 4000
+Generating matrices of size 4000x4000...
+Matrices generated and loaded by process 0
+All processes have received matrices. Starting parallel multiplication...
+Matrix multiplication completed in 37.2116 seconds
+Super computer used 16 processors

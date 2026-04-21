@@ -211,6 +211,7 @@ int main(int argc, char** argv) {
 
     if (rank == 0) {
         cout << "Matrix multiplication completed in " << exp.exec_time << " seconds\n";
+        cout << "Super computer used " << exp.processes_num << " processors\n";
     }
 
     MPI_Finalize();
